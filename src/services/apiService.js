@@ -4,7 +4,7 @@ class apiService {
   // Cliente Service - REGISTER
   async register(userData) {
     try {
-      const response = await clientApi.post('/api/clients/register', userData);
+      const response = await clientApi.post('/api/clients', userData);
       return response.data;
     } catch (error) {
       throw new Error(

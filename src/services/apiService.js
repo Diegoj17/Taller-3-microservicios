@@ -1,112 +1,54 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
-const EMAIL_SERVICE_URL = import.meta.env.VITE_EMAIL_SERVICE_URL || 'http://localhost:3002';
+import { clientApi} from '../api/Axios';
 
-class ApiService {
-  // Cliente Service
+class apiService {
+  // Cliente Service - REGISTER
   async register(userData) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/clients/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error en el registro');
-      }
-
-      return await response.json();
+      const response = await clientApi.post('/api/clients/register', userData);
+      return response.data;
     } catch (error) {
-      throw new Error(error.message || 'Error de conexión');
+      throw new Error(
+        error.response?.data?.message || 
+        error.message || 
+        'Error en el registro'
+      );
     }
   }
 
+  // Cliente Service - LOGIN
   async login(credentials) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/clients/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(credentials),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error en el login');
+      const response = await clientApi.post('/api/clients/login', credentials);
+      
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
       }
-
-      return await response.json();
+      
+      return response.data;
     } catch (error) {
-      throw new Error(error.message || 'Error de conexión');
+      throw new Error(
+        error.response?.data?.message || 
+        error.message || 
+        'Error en el login'
+      );
     }
   }
 
-  async getProfile(token) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/clients/profile`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al obtener el perfil');
-      }
-
-      return await response.json();
-    } catch (error) {
-      throw new Error(error.message || 'Error de conexión');
-    }
+  // Método para verificar si el usuario está autenticado
+  isAuthenticated() {
+    return !!localStorage.getItem('token');
   }
 
-  // Email Service
-  async sendWelcomeEmail(emailData) {
-    try {
-      const response = await fetch(`${EMAIL_SERVICE_URL}/api/emails/send-welcome`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(emailData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error enviando email');
-      }
-
-      return await response.json();
-    } catch (error) {
-      throw new Error(error.message || 'Error de conexión con el servicio de email');
-    }
+  // Método para obtener el token
+  getToken() {
+    return localStorage.getItem('token');
   }
 
-  async sendVerificationEmail(emailData) {
-    try {
-      const response = await fetch(`${EMAIL_SERVICE_URL}/api/emails/send-verification`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(emailData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error enviando email de verificación');
-      }
-
-      return await response.json();
-    } catch (error) {
-      throw new Error(error.message || 'Error de conexión con el servicio de email');
-    }
+  // Logout
+  logout() {
+    localStorage.removeItem('token');
+    window.location.href = '/login';
   }
 }
 
-export default new ApiService();
+export default new apiService();

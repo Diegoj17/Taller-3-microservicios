@@ -12,15 +12,12 @@ const Modal = ({
 }) => {
   useEffect(() => {
     if (isOpen) {
-      console.log('[Modal] opening modal');
       document.body.style.overflow = 'hidden';
     } else {
-      console.log('[Modal] modal closed (isOpen false)');
       document.body.style.overflow = 'unset';
     }
 
     return () => {
-      console.log('[Modal] cleanup on unmount');
       document.body.style.overflow = 'unset';
     };
   }, [isOpen]);

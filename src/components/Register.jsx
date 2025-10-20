@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { User, Gift, Package, CheckCircle, Mail, Phone, MapPin, CreditCard, Eye, EyeOff, Lock } from 'lucide-react';
 import ApiService from '../services/apiService';
+import Modal from './Modal';
 
 export default function CustomerRegistration({ onRegister }) {
   useEffect(() => {
     document.title = 'Crear cuenta | Supermercado Premium';
   }, []);
+
   const [step, setStep] = useState('form');
   const [formData, setFormData] = useState({
     nombre: '',
@@ -13,8 +15,10 @@ export default function CustomerRegistration({ onRegister }) {
     email: '',
     telefono: '',
     direccion: '',
+    ciudad: '',
+    codigoPostal: ''
   });
-  // customerData now stored in modalInfo.data when needed
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -27,8 +31,12 @@ export default function CustomerRegistration({ onRegister }) {
     number: false,
     special: false
   });
-  const [errorMessage, setErrorMessage] = useState('');
-  const [modalInfo, setModalInfo] = useState({ open: false, type: '', message: '', data: null });
+  
+  // Estados para los modales
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+  const [registeredCustomer, setRegisteredCustomer] = useState(null);
 
   const handleInputChange = (e) => {
     setFormData({
@@ -38,7 +46,6 @@ export default function CustomerRegistration({ onRegister }) {
   };
 
   const handlePhoneChange = (e) => {
-    // strip non-digits and limit to 10 characters
     const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
     setFormData({
       ...formData,
@@ -75,38 +82,28 @@ export default function CustomerRegistration({ onRegister }) {
     setConfirmPassword(e.target.value);
   };
 
-const handleSubmit = async () => {
+  const handleSubmit = async () => {
     if (!isFormValid()) return;
 
     setIsSubmitting(true);
-    setErrorMessage('');
 
     try {
-      // Preparar datos para el microservicio de clientes
+      // Preparar datos para el registro
       const userData = {
         nombre: formData.nombre,
         apellido: formData.apellido,
         email: formData.email,
         telefono: formData.telefono,
         direccion: formData.direccion,
+        ciudad: formData.ciudad,
+        codigoPostal: formData.codigoPostal,
         password: password
       };
 
-      // 1. Registrar el cliente en el microservicio de clientes
+      // Registrar el cliente - el email se envía automáticamente via RabbitMQ
       const registerResponse = await ApiService.register(userData);
-
-      // 2. Enviar email de bienvenida (no bloqueante)
-      try {
-        await ApiService.sendWelcomeEmail({
-          to: formData.email,
-          name: `${formData.nombre} ${formData.apellido}`,
-          clientId: registerResponse.client?._id || registerResponse.client?.id || `CL-${Math.floor(10000 + Math.random() * 90000)}`
-        });
-      } catch (emailError) {
-        console.warn('Email de bienvenida no pudo ser enviado:', emailError.message);
-      }
-
-      // Preparar datos para mostrar en la UI
+      
+      // Preparar datos del cliente registrado
       const newCustomer = {
         id: registerResponse.client?._id || registerResponse.client?.id || `CL-${Math.floor(10000 + Math.random() * 90000)}`,
         nombre: formData.nombre,
@@ -114,25 +111,43 @@ const handleSubmit = async () => {
         email: formData.email,
         telefono: formData.telefono,
         direccion: formData.direccion,
-        puntosLealtad: 0,
+        ciudad: formData.ciudad,
+        codigoPostal: formData.codigoPostal,
+        puntosLealtad: 100, // Puntos de bienvenida
         fechaRegistro: new Date().toLocaleDateString('es-ES'),
         envio: {
           estado: 'pendiente',
           tracking: `PKG-${Math.floor(100000 + Math.random() * 900000)}`,
-          descripcion: 'Paquete de Bienvenida'
+          descripcion: 'Paquete de Bienvenida Premium'
         }
       };
 
-  // Guardar datos en el modalInfo para mostrarlos
-  // setCustomerData(newCustomer);
-  // Mostrar modal de éxito
-  setModalInfo({ open: true, type: 'success', message: 'Registro exitoso', data: newCustomer });
-  if (typeof onRegister === 'function') onRegister(newCustomer);
-  setStep('success');
+      // Mostrar modal de éxito
+      setModalMessage(`¡Registro exitoso! Se ha enviado automáticamente un email de bienvenida a ${formData.email}`);
+      setRegisteredCustomer(newCustomer);
+      setShowSuccessModal(true);
+      
+      // Resetear formulario
+      setFormData({
+        nombre: '',
+        apellido: '',
+        email: '',
+        telefono: '',
+        direccion: '',
+        ciudad: '',
+        codigoPostal: ''
+      });
+      setPassword('');
+      setConfirmPassword('');
+
+      // Llamar callback si existe
+      if (typeof onRegister === 'function') {
+        onRegister(newCustomer);
+      }
 
     } catch (error) {
-      console.error('Error en el registro:', error);
-      setErrorMessage(error.message || 'Error al registrar el cliente. Por favor, intenta nuevamente.');
+      setModalMessage(error.message || 'Error al registrar el cliente. Por favor, intenta nuevamente.');
+      setShowErrorModal(true);
     } finally {
       setIsSubmitting(false);
     }
@@ -146,26 +161,18 @@ const handleSubmit = async () => {
       formData.email &&
       formData.telefono &&
       formData.direccion &&
+      formData.ciudad &&
       pwdValid
     );
   };
 
-  const handleCloseModal = () => {
-    // Si era un modal de éxito, resetear el formulario y volver al paso inicial
-    if (modalInfo.type === 'success') {
-      setFormData({
-        nombre: '',
-        apellido: '',
-        email: '',
-        telefono: '',
-        direccion: '',
-      });
-      setPassword('');
-      setConfirmPassword('');
-      setStep('form');
-    }
-    // Cerrar cualquier modal
-    setModalInfo({ open: false, type: '', message: '', data: null });
+  const handleCloseSuccessModal = () => {
+    setShowSuccessModal(false);
+    setStep('form');
+  };
+
+  const handleCloseErrorModal = () => {
+    setShowErrorModal(false);
   };
 
   return (
@@ -183,8 +190,6 @@ const handleSubmit = async () => {
               Regístrate y comienza a acumular puntos en cada compra
             </p>
           </div>
-
-          {errorMessage && <div style={styles.errorMessage}>{errorMessage}</div>}
 
           <div>
             <div style={styles.gridTwo}>
@@ -270,7 +275,6 @@ const handleSubmit = async () => {
                     maxLength={10}
                     pattern="[0-9]*"
                     onPaste={(e) => {
-                      // sanitize pasted content to digits only
                       const paste = (e.clipboardData || window.clipboardData).getData('text');
                       const digits = paste.replace(/\D/g, '').slice(0, 10);
                       e.preventDefault();
@@ -302,32 +306,34 @@ const handleSubmit = async () => {
             </div>
 
             <div style={styles.gridTwo}>
-            <div>
-              <label style={styles.label}>Ciudad *</label>
-              <input
-                type="text"
-                value={formData.ciudad}
-                onChange={(e) => setFormData({...formData, ciudad: e.target.value})}
-                placeholder="Tu ciudad"
-                style={styles.inputSimple}
-                onFocus={(e) => e.target.style.borderColor = '#FF5742'}
-                onBlur={(e) => e.target.style.borderColor = '#CBD5E1'}
-              />
-            </div>
+              <div>
+                <label style={styles.label}>Ciudad *</label>
+                <input
+                  type="text"
+                  name="ciudad"
+                  value={formData.ciudad}
+                  onChange={handleInputChange}
+                  placeholder="Tu ciudad"
+                  style={styles.inputSimple}
+                  onFocus={(e) => e.target.style.borderColor = '#FF5742'}
+                  onBlur={(e) => e.target.style.borderColor = '#CBD5E1'}
+                />
+              </div>
 
-            <div>
-              <label style={styles.label}>Código Postal</label>
-              <input
-                type="text"
-                value={formData.codigoPostal}
-                onChange={(e) => setFormData({...formData, codigoPostal: e.target.value})}
-                placeholder="110111"
-                style={styles.inputSimple}
-                onFocus={(e) => e.target.style.borderColor = '#FF5742'}
-                onBlur={(e) => e.target.style.borderColor = '#CBD5E1'}
-              />
+              <div>
+                <label style={styles.label}>Código Postal</label>
+                <input
+                  type="text"
+                  name="codigoPostal"
+                  value={formData.codigoPostal}
+                  onChange={handleInputChange}
+                  placeholder="110111"
+                  style={styles.inputSimple}
+                  onFocus={(e) => e.target.style.borderColor = '#FF5742'}
+                  onBlur={(e) => e.target.style.borderColor = '#CBD5E1'}
+                />
+              </div>
             </div>
-          </div>
 
             <div style={styles.gridTwo}>
               <div style={styles.inputGroup}>
@@ -434,37 +440,149 @@ const handleSubmit = async () => {
         </div>
       ) : (
         <div style={styles.successCard}>
-          
+          {/* Contenido de éxito si lo necesitas */}
         </div>
       )}
 
-      {modalInfo.open && (
-        <div style={modalStyles.backdrop} onClick={handleCloseModal}>
-          <div style={modalStyles.modal} onClick={(e) => e.stopPropagation()}>
-            <div style={modalStyles.header}>
-              <h3 style={{ margin: 0 }}>{modalInfo.type === 'success' ? '¡Éxito!' : 'Error'}</h3>
-            </div>
-            <div style={modalStyles.body}>
-              <p>{modalInfo.message}</p>
-              {modalInfo.type === 'success' && modalInfo.data && (
-                <div style={modalStyles.details}>
-                  <div><strong>ID:</strong> {modalInfo.data.id}</div>
-                  <div><strong>Tracking:</strong> {modalInfo.data.envio?.tracking}</div>
+      {/* Modal de Éxito */}
+      <Modal
+        isOpen={showSuccessModal}
+        onClose={handleCloseSuccessModal}
+        title="¡Registro Exitoso!"
+        type="success"
+      >
+        <div style={modalContentStyles}>
+          <p style={modalContentStyles.message}>{modalMessage}</p>
+          
+          {registeredCustomer && (
+            <div style={modalContentStyles.details}>
+              <div style={modalContentStyles.detailRow}>
+                <strong>ID Cliente:</strong> {registeredCustomer.id}
+              </div>
+              <div style={modalContentStyles.detailRow}>
+                <strong>Nombre:</strong> {registeredCustomer.nombre} {registeredCustomer.apellido}
+              </div>
+              <div style={modalContentStyles.detailRow}>
+                <strong>Email:</strong> {registeredCustomer.email}
+              </div>
+              <div style={modalContentStyles.detailRow}>
+                <strong>Teléfono:</strong> {registeredCustomer.telefono}
+              </div>
+              <div style={modalContentStyles.detailRow}>
+                <strong>Puntos de Bienvenida:</strong> {registeredCustomer.puntosLealtad} puntos
+              </div>
+              {registeredCustomer.envio && (
+                <div style={modalContentStyles.shippingInfo}>
+                  <div style={modalContentStyles.detailRow}>
+                    <strong>Número de Tracking:</strong> {registeredCustomer.envio.tracking}
+                  </div>
+                  <div style={modalContentStyles.detailRow}>
+                    <strong>Estado:</strong> 
+                    <span style={modalContentStyles.status}>
+                      {registeredCustomer.envio.estado}
+                    </span>
+                  </div>
                 </div>
               )}
             </div>
-            <div style={modalStyles.footer}>
-              <button onClick={handleCloseModal} style={modalStyles.button}>Cerrar</button>
-            </div>
-          </div>
+          )}
+          
+          <button 
+            onClick={handleCloseSuccessModal}
+            style={modalContentStyles.closeButton}
+            onMouseEnter={(e) => {
+              e.target.style.transform = 'translateY(-2px)';
+              e.target.style.boxShadow = '0 6px 20px rgba(255, 87, 66, 0.35)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = 'none';
+            }}
+          >
+            Continuar
+          </button>
         </div>
-      )}
+      </Modal>
 
+      {/* Modal de Error */}
+      <Modal
+        isOpen={showErrorModal}
+        onClose={handleCloseErrorModal}
+        title="Error en el Registro"
+        type="error"
+      >
+        <div style={modalContentStyles}>
+          <p style={modalContentStyles.message}>{modalMessage}</p>
+          <button 
+            onClick={handleCloseErrorModal}
+            style={modalContentStyles.closeButton}
+            onMouseEnter={(e) => {
+              e.target.style.transform = 'translateY(-2px)';
+              e.target.style.boxShadow = '0 6px 20px rgba(255, 87, 66, 0.35)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = 'none';
+            }}
+          >
+            Entendido
+          </button>
+        </div>
+      </Modal>
 
       <style>{keyframes}</style>
     </div>
   );
 }
+
+// Estilos para el contenido del modal
+const modalContentStyles = {
+  message: {
+    marginBottom: '20px',
+    fontSize: '16px',
+    lineHeight: '1.5',
+    color: '#64748B'
+  },
+  details: {
+    background: '#F8FAFC',
+    padding: '16px',
+    borderRadius: '12px',
+    marginBottom: '20px',
+    border: '1px solid #E2E8F0'
+  },
+  detailRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '8px',
+    fontSize: '14px'
+  },
+  shippingInfo: {
+    marginTop: '12px',
+    paddingTop: '12px',
+    borderTop: '1px solid #E2E8F0'
+  },
+  status: {
+    background: '#FF5742',
+    color: 'white',
+    padding: '4px 8px',
+    borderRadius: '6px',
+    fontSize: '12px',
+    fontWeight: '600'
+  },
+  closeButton: {
+    background: 'linear-gradient(135deg, #FF5742 0%, #FF6B5B 100%)',
+    color: 'white',
+    border: 'none',
+    padding: '12px 24px',
+    borderRadius: '12px',
+    fontSize: '16px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    width: '100%',
+    transition: 'all 0.3s ease'
+  }
+};
 
 const keyframes = `
   @keyframes slideIn {
@@ -517,16 +635,6 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-  },
-
-  errorMessage: {
-    color: '#FF5742',
-    backgroundColor: '#FFE5E0',
-    padding: '12px 16px',
-    borderRadius: '8px',
-    marginBottom: '16px',
-    fontSize: '14px',
-    fontWeight: '500'
   },
   formCard: {
     background: 'white',
@@ -627,7 +735,7 @@ const styles = {
   passwordToggle: {
     position: 'absolute',
     right: '12px',
-    top: '75%',
+    top: '70%',
     transform: 'translateY(-50%)',
     cursor: 'pointer',
     color: '#FF5742',
@@ -635,29 +743,31 @@ const styles = {
   },
   passwordChecksFloating: {
     position: 'absolute',
-    left: '-342.5px',
+    right: 'calc(100% + 31px)',
     top: '0',
-    width: '270px',
+    width: '210px',
+    maxHeight: '40vh',
+    overflowY: 'auto',
     background: 'white',
     border: '2px solid #FF5742',
-    padding: '18px',
-    borderRadius: '14px',
+    padding: '14px',
+    borderRadius: '12px',
     boxShadow: '0 10px 30px rgba(255, 87, 66, 0.25)',
     animation: 'slideInLeft 0.3s ease-out',
-    zIndex: 1000
+    zIndex: 9999
   },
   checksTitle: {
     fontSize: '14px',
     fontWeight: '700',
     color: '#000000',
-    marginBottom: '14px',
+    marginBottom: '0.5rem',
     borderBottom: '2px solid #FF5742',
     paddingBottom: '10px'
   },
   checkItem: {
     fontSize: '14px',
     color: '#000000',
-    marginBottom: '10px',
+    marginBottom: '0rem',
     display: 'flex',
     alignItems: 'center',
     transition: 'all 0.3s ease'
@@ -689,209 +799,5 @@ const styles = {
     width: '100%',
     boxShadow: '0 25px 70px rgba(0, 0, 0, 0.25)',
     animation: 'slideIn 0.6s ease-out'
-  },
-  successHeader: {
-    textAlign: 'center',
-    marginBottom: '48px'
-  },
-  successIcon: {
-    width: '120px',
-    height: '120px',
-    background: 'linear-gradient(135deg, #38BDF8 0%, #7DD3FC 100%)',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    margin: '0 auto 28px',
-    animation: 'scaleIn 0.5s ease-out',
-    boxShadow: '0 10px 30px rgba(56, 189, 248, 0.3)'
-  },
-  successTitle: {
-    fontSize: '36px',
-    fontWeight: '700',
-    color: '#FF5742',
-    marginBottom: '12px',
-    margin: '0 0 12px 0'
-  },
-  successSubtitle: {
-    color: '#000000',
-    fontSize: '18px',
-    margin: 0
-  },
-  customerCard: {
-    background: 'linear-gradient(135deg, #455A64 0%, #607D8B 100%)',
-    borderRadius: '18px',
-    padding: '28px',
-    marginBottom: '28px',
-    color: 'white',
-    boxShadow: '0 8px 24px rgba(69, 90, 100, 0.2)'
-  },
-  customerInfoRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '18px'
-  },
-  customerLabel: {
-    fontSize: '15px',
-    opacity: 0.9,
-    fontWeight: '500'
-  },
-  customerValue: {
-    fontSize: '19px',
-    fontWeight: '700'
-  },
-  customerDateValue: {
-    fontSize: '17px',
-    fontWeight: '600'
-  },
-  statsGrid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '24px',
-    marginBottom: '36px'
-  },
-  pointsCard: {
-    background: 'linear-gradient(135deg, #FF5742 0%, #FF6B5B 100%)',
-    borderRadius: '18px',
-    padding: '32px',
-    color: 'white',
-    textAlign: 'center',
-    boxShadow: '0 8px 24px rgba(255, 87, 66, 0.3)'
-  },
-  cardIcon: {
-    marginBottom: '16px'
-  },
-  pointsLabel: {
-    fontSize: '16px',
-    opacity: 0.95,
-    marginBottom: '12px',
-    fontWeight: '500'
-  },
-  pointsValue: {
-    fontSize: '48px',
-    fontWeight: '700',
-    letterSpacing: '-1px'
-  },
-  pointsSubtext: {
-    fontSize: '14px',
-    opacity: 0.9,
-    marginTop: '12px'
-  },
-  shippingCard: {
-    background: 'linear-gradient(135deg, #38BDF8 0%, #7DD3FC 100%)',
-    borderRadius: '18px',
-    padding: '32px',
-    color: 'white',
-    textAlign: 'center',
-    boxShadow: '0 8px 24px rgba(56, 189, 248, 0.3)'
-  },
-  shippingLabel: {
-    fontSize: '16px',
-    opacity: 0.95,
-    marginBottom: '12px',
-    fontWeight: '500'
-  },
-  shippingStatus: {
-    background: 'rgba(255, 255, 255, 0.25)',
-    padding: '10px 20px',
-    borderRadius: '24px',
-    fontSize: '15px',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    marginBottom: '12px',
-    display: 'inline-block',
-    letterSpacing: '0.5px'
-  },
-  shippingDescription: {
-    fontSize: '14px',
-    opacity: 0.9
-  },
-  trackingCard: {
-    background: '#F1F5F9',
-    borderRadius: '16px',
-    padding: '24px',
-    marginBottom: '28px'
-  },
-  trackingTitle: {
-    fontSize: '16px',
-    fontWeight: '700',
-    color: '#455A64',
-    marginBottom: '16px'
-  },
-  trackingContent: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px'
-  },
-  trackingLabel: {
-    fontSize: '14px',
-    color: '#78909C',
-    marginBottom: '4px'
-  },
-  trackingNumber: {
-    fontSize: '18px',
-    fontWeight: '700',
-    color: '#455A64'
-  },
-  newCustomerButton: {
-    width: '100%',
-    padding: '16px',
-    background: 'white',
-    color: '#FF5742',
-    border: '2px solid #FF5742',
-    borderRadius: '14px',
-    fontSize: '17px',
-    fontWeight: '700',
-    cursor: 'pointer',
-    transition: 'all 0.3s',
-    letterSpacing: '0.5px'
-  }
-};
-
-const modalStyles = {
-  backdrop: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: 'rgba(0,0,0,0.4)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2000
-  },
-  modal: {
-    width: '420px',
-    background: 'white',
-    borderRadius: '12px',
-    boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
-    overflow: 'hidden'
-  },
-  header: {
-    padding: '18px 20px',
-    borderBottom: '1px solid #eee'
-  },
-  body: {
-    padding: '18px 20px'
-  },
-  details: {
-    marginTop: '12px',
-    fontSize: '14px',
-    color: '#333'
-  },
-  footer: {
-    padding: '12px 20px',
-    borderTop: '1px solid #eee',
-    textAlign: 'right'
-  },
-  button: {
-    background: '#FF5742',
-    color: 'white',
-    border: 'none',
-    padding: '10px 14px',
-    borderRadius: '8px',
-    cursor: 'pointer'
   }
 };

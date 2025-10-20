@@ -150,13 +150,6 @@ export default function Login() {
             </div>
           </div>
 
-          <div style={styles.optionsRow}>
-            <label style={styles.checkboxLabel}>
-              
-            </label>
-            <a href="#" style={styles.forgotLink}>¿Olvidaste tu contraseña?</a>
-          </div>
-
           <button
             onClick={handleLogin}
             disabled={!email || !password || isLoading}

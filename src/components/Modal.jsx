@@ -8,7 +8,8 @@ const Modal = ({
   children, 
   type = 'success',
   showCloseButton = true,
-  overlayClickClose = true 
+  overlayClickClose = true,
+  overlay = true
 }) => {
   useEffect(() => {
     if (isOpen) {
@@ -60,8 +61,14 @@ const Modal = ({
     }
   };
 
+  const overlayStyle = {
+    ...styles.overlay,
+    backgroundColor: overlay ? styles.overlay.backgroundColor : 'transparent',
+    backdropFilter: overlay ? styles.overlay.backdropFilter : 'none'
+  };
+
   return (
-    <div style={styles.overlay} onClick={handleOverlayClick}>
+    <div style={overlayStyle} onClick={handleOverlayClick}>
       <div style={{...styles.content, borderTop: `4px solid ${getBorderColor()}`}}>
         {showCloseButton && (
           <button 
@@ -95,44 +102,9 @@ const Modal = ({
         </div>
       </div>
 
-      <style>{modalKeyframes}</style>
     </div>
   );
 };
-
-const modalKeyframes = `
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-
-  @keyframes modalSlideIn {
-    from {
-      opacity: 0;
-      transform: translateY(-50px) scale(0.9);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0) scale(1);
-    }
-  }
-
-  @keyframes iconBounce {
-    0%, 20%, 53%, 80%, 100% {
-      transform: translateY(0) scale(1);
-    }
-    40%, 43% {
-      transform: translateY(-10px) scale(1.1);
-    }
-    70% {
-      transform: translateY(-5px) scale(1.05);
-    }
-  }
-`;
 
 const styles = {
   overlay: {
@@ -141,8 +113,9 @@ const styles = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(15, 23, 42, 0.7)',
-    backdropFilter: 'blur(8px)',
+    // Hacer el overlay más suave para no ocultar completamente el contenido de fondo
+    backgroundColor: 'rgba(15, 23, 42, 0.35)',
+    backdropFilter: 'blur(4px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -156,7 +129,8 @@ const styles = {
     padding: '48px 40px 40px 40px',
     maxWidth: '480px',
     width: '100%',
-    boxShadow: '0 32px 64px rgba(0, 0, 0, 0.2)',
+    // Sombra más suave para que no compita con el overlay
+    boxShadow: '0 20px 40px rgba(0, 0, 0, 0.12)',
     position: 'relative',
     animation: 'modalSlideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
     border: '1px solid rgba(255, 255, 255, 0.3)'

@@ -2,45 +2,16 @@ import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import Dashboard from '../components/Dashboard';
 import Shipping from '../components/Shipping';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/useAuth.jsx';
 
 export default function MainPage({ initialView = 'dashboard' }) {
   const [currentView, setCurrentView] = useState(initialView);
-  
-  // Datos de ejemplo más realistas
-  const defaultCustomer = {
-    id: 'CL-000011',
-    nombre: 'Carlos',
-    apellido: 'Rodríguez',
-    email: 'carlos.rodriguez@email.com',
-    telefono: '3001234567',
-    direccion: 'Carrera 45 # 26-85, Bogotá',
-    puntosLealtad: 0,
-    fechaRegistro: '16/10/2024',
-    genero: 'hombre', // 'hombre' o 'mujer'
-    envio: { 
-      estado: 'pendiente',
-      tracking: 'PKG-583492', 
-      descripcion: 'Paquete de Bienvenida Premium'
-    },
-    welcomePackage: { 
-      tracking: 'PKG-583492', 
-      descripcion: 'Paquete de Bienvenida Premium (incluye sanduchera eléctrica)', 
-      contenido: [
-        'Sanduchera eléctrica de regalo',
-        'Tarjeta de Cliente Premium',
-        'Cupón de 15% descuento en primera compra',
-        '500 puntos de bonificación',
-        'Guía de beneficios exclusivos',
-        'Sorpresa especial'
-      ], 
-      fechaCreacion: '16/10/2024', 
-      direccion: 'Carrera 45 # 26-85, Bogotá', 
-      estimado: '20/10/2024',
-      estado: 'pendiente'
-    }
-  };
+  const navigate = useNavigate();
+  const { customerData, logout, loading } = useAuth();
 
-  const [customerData, setCustomerData] = useState(defaultCustomer);
+  // Eliminar el efecto que redirige al login
+  // La protección ya está manejada por ProtectedRoute
 
   const handleNavigate = (view) => {
     setCurrentView(view);
@@ -51,7 +22,6 @@ export default function MainPage({ initialView = 'dashboard' }) {
   };
 
   useEffect(() => {
-    // Actualiza el título según la vista dentro de MainPage
     if (currentView === 'dashboard') {
       document.title = 'Inicio | Supermercado Premium';
     } else if (currentView === 'shipping') {
@@ -60,11 +30,22 @@ export default function MainPage({ initialView = 'dashboard' }) {
   }, [currentView]);
 
   const handleLogout = () => {
-    // Forzar recarga a /login (evita condiciones de carrera al desmontar componentes)
-    window.location.href = '/login';
-    // limpiar estado por si acaso (ejecuta después de la navegación)
-    setTimeout(() => setCustomerData(null), 0);
+    logout();
+    navigate('/login');
   };
+
+  if (loading) {
+    return (
+      <div style={styles.loadingContainer}>
+        <div style={styles.loadingSpinner}></div>
+        <p style={styles.loadingText}>Cargando...</p>
+      </div>
+    );
+  }
+
+  if (!customerData) {
+    return null;
+  }
 
   return (
     <div style={styles.container}>
@@ -76,13 +57,13 @@ export default function MainPage({ initialView = 'dashboard' }) {
       />
 
       <main style={styles.mainContent}>
-        {currentView === 'dashboard' && customerData && (
+        {currentView === 'dashboard' && (
           <Dashboard 
             customerData={customerData} 
             onNavigateToShipping={handleNavigateToShipping} 
           />
         )}
-        {currentView === 'shipping' && customerData && (
+        {currentView === 'shipping' && (
           <Shipping customerData={customerData} />
         )}
       </main>
@@ -94,9 +75,18 @@ export default function MainPage({ initialView = 'dashboard' }) {
           </span>
         </div>
       </footer>
+
+      <style>{keyframes}</style>
     </div>
   );
 }
+
+const keyframes = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
 
 const styles = {
   container: {
@@ -113,6 +103,28 @@ const styles = {
     margin: '0 auto',
     width: '100%',
     boxSizing: 'border-box'
+  },
+  loadingContainer: {
+    minHeight: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 50%, #E2E8F0 100%)'
+  },
+  loadingSpinner: {
+    width: '50px',
+    height: '50px',
+    border: '4px solid #E2E8F0',
+    borderTop: '4px solid #FF5742',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite'
+  },
+  loadingText: {
+    marginTop: '20px',
+    fontSize: '16px',
+    color: '#64748B',
+    fontWeight: '600'
   },
   footer: {
     background: 'linear-gradient(135deg, #455A64 0%, #37474F 100%)',
@@ -133,20 +145,5 @@ const styles = {
     fontSize: '14px',
     color: '#CBD5E1',
     fontWeight: '500'
-  },
-  footerLinks: {
-    display: 'flex',
-    gap: '2rem',
-    alignItems: 'center'
-  },
-  footerLink: {
-    color: '#CBD5E1',
-    textDecoration: 'none',
-    fontSize: '14px',
-    fontWeight: '500',
-    transition: 'color 0.3s ease',
-    ':hover': {
-      color: 'white'
-    }
   }
 };

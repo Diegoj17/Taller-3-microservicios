@@ -6,6 +6,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://clientregiste
 // Crear instancia de axios para el cliente service
 const clientApi = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -33,6 +34,17 @@ clientApi.interceptors.response.use(
       localStorage.removeItem('token');
       window.location.href = '/login';
     }
+    return Promise.reject(error);
+  }
+);
+
+// Agregar interceptor para CORS
+clientApi.interceptors.request.use(
+  (config) => {
+    config.headers['Access-Control-Allow-Origin'] = '*';
+    return config;
+  },
+  (error) => {
     return Promise.reject(error);
   }
 );

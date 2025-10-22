@@ -1,102 +1,88 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, Mail, Eye, EyeOff, LogIn, CheckCircle } from 'lucide-react';
+import { Lock, Mail, Eye, EyeOff, LogIn } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/useAuth.jsx';
+import Modal from './Modal';
 
 export default function Login() {
-  useEffect(() => {
-    document.title = 'Iniciar sesión | Supermercado Premium';
-  }, []);
+  const navigate = useNavigate();
+  const { login, isAuthenticated, loading: authLoading } = useAuth();
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userData, setUserData] = useState(null);
+  const [error, setError] = useState('');
+  const [showErrorModal, setShowErrorModal] = useState(false);
 
-  const handleLogin = () => {
-    if (!email || !password) return;
+  useEffect(() => {
+    document.title = 'Iniciar sesión | Supermercado Premium';
+    
+    // Si ya está autenticado, redirigir a main
+    if (isAuthenticated) {
+      navigate('/main');
+    }
+  }, [isAuthenticated, navigate]);
+
+  const handleLogin = async () => {
+    if (!email || !password || isLoading) return;
     
     setIsLoading(true);
+    setError('');
+    setShowErrorModal(false);
 
-    setTimeout(() => {
-      const user = {
-        nombre: 'Juan',
-        apellido: 'Pérez',
+    try {
+      const credentials = {
         email: email,
-        id: 'CL-45782',
-        puntosLealtad: 1250
+        contrasenia: password
       };
+
+      // Usar el login del contexto
+      const result = await login(credentials);
       
-      setUserData(user);
-      setIsLoggedIn(true);
+      if (result.success) {
+        navigate('/main');
+      } else {
+        throw new Error(result.message || 'Error en el inicio de sesión');
+      }
+      
+    } catch (error) {
+      
+      let friendlyMessage = 'Ocurrió un error al iniciar sesión.';
+      
+      if (error.message.includes('no encontrado') || error.message.includes('404')) {
+        friendlyMessage = 'Usuario no encontrado. Verifica tu correo electrónico.';
+      } else if (error.message.includes('Contraseña incorrecta') || error.message.includes('401')) {
+        friendlyMessage = 'Contraseña incorrecta. Por favor, intenta nuevamente.';
+      } else if (error.message.includes('500')) {
+        friendlyMessage = 'Error del servidor. Por favor, intenta más tarde.';
+      } else if (error.message.includes('Network Error') || error.message.includes('ECONNREFUSED')) {
+        friendlyMessage = 'No se puede conectar al servidor. Verifica tu conexión a internet.';
+      } else if (error.message) {
+        friendlyMessage = error.message;
+      }
+      
+      setError(friendlyMessage);
+      setTimeout(() => {
+        setShowErrorModal(true);
+      }, 100);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && email && password) {
+    if (e.key === 'Enter' && email && password && !isLoading) {
       handleLogin();
     }
   };
 
-  if (isLoggedIn) {
-    return (
-      <div style={styles.container}>
-        <div style={styles.successCard}>
-          <div style={styles.successHeader}>
-            <div style={styles.successIconWrapper}>
-              <CheckCircle size={60} color="white" strokeWidth={2.5} />
-            </div>
-            <h2 style={styles.successTitle}>¡Bienvenido de nuevo!</h2>
-            <p style={styles.successSubtitle}>
-              {userData.nombre} {userData.apellido}
-            </p>
-          </div>
-
-          <div style={styles.userInfoCard}>
-            <div style={styles.infoRow}>
-              <span style={styles.infoLabel}>ID de Cliente</span>
-              <span style={styles.infoValue}>{userData.id}</span>
-            </div>
-            <div style={styles.infoRow}>
-              <span style={styles.infoLabel}>Correo Electrónico</span>
-              <span style={styles.infoValue}>{userData.email}</span>
-            </div>
-          </div>
-
-          <div style={styles.pointsCard}>
-            <img src="/img/tienda.png" alt="Supermercado Logo" width="80" height="80" />
-            <div style={styles.pointsLabel}>Puntos de Lealtad Disponibles</div>
-            <div style={styles.pointsValue}>{userData.puntosLealtad.toLocaleString()}</div>
-            <div style={styles.pointsSubtext}>¡Sigue comprando para ganar más!</div>
-          </div>
-
-          <button
-            onClick={() => {
-              setIsLoggedIn(false);
-              setEmail('');
-              setPassword('');
-              setUserData(null);
-            }}
-            style={styles.logoutButton}
-            onMouseEnter={(e) => {
-              e.target.style.background = '#FF5742';
-              e.target.style.color = 'white';
-              e.target.style.borderColor = '#FF5742';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.background = 'white';
-              e.target.style.color = '#FF5742';
-              e.target.style.borderColor = '#FF5742';
-            }}
-          >
-            Cerrar Sesión
-          </button>
-        </div>
-
-        <style>{keyframes}</style>
-      </div>
-    );
-  }
+  const handleCloseErrorModal = () => {
+    setShowErrorModal(false);
+    setTimeout(() => {
+      setError('');
+    }, 300);
+  };
 
   return (
     <div style={styles.container}>
@@ -121,8 +107,7 @@ export default function Login() {
                 onKeyPress={handleKeyPress}
                 placeholder="tu@email.com"
                 style={styles.input}
-                onFocus={(e) => e.target.style.borderColor = '#FF5742'}
-                onBlur={(e) => e.target.style.borderColor = '#CBD5E1'}
+                disabled={isLoading || authLoading}
               />
             </div>
           </div>
@@ -138,12 +123,15 @@ export default function Login() {
                 onKeyPress={handleKeyPress}
                 placeholder="••••••••"
                 style={styles.input}
-                onFocus={(e) => e.target.style.borderColor = '#FF5742'}
-                onBlur={(e) => e.target.style.borderColor = '#CBD5E1'}
+                disabled={isLoading || authLoading}
               />
               <div
-                onClick={() => setShowPassword(!showPassword)}
-                style={styles.eyeIcon}
+                onClick={() => !isLoading && setShowPassword(!showPassword)}
+                style={{
+                  ...styles.eyeIcon,
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  opacity: isLoading ? 0.5 : 1
+                }}
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </div>
@@ -152,38 +140,33 @@ export default function Login() {
 
           <button
             onClick={handleLogin}
-            disabled={!email || !password || isLoading}
+            disabled={!email || !password || isLoading || authLoading}
             style={{
               ...styles.loginButton,
-              background: email && password && !isLoading 
+              background: email && password && !isLoading && !authLoading
                 ? 'linear-gradient(135deg, #FF5742 0%, #FF6B5B 100%)' 
                 : '#CBD5E1',
-              cursor: email && password && !isLoading ? 'pointer' : 'not-allowed',
-              boxShadow: email && password && !isLoading 
+              cursor: email && password && !isLoading && !authLoading ? 'pointer' : 'not-allowed',
+              boxShadow: email && password && !isLoading && !authLoading
                 ? '0 6px 20px rgba(255, 87, 66, 0.35)' 
-                : 'none'
+                : 'none',
+              opacity: isLoading || authLoading ? 0.7 : 1
             }}
             onMouseEnter={(e) => {
-              if (email && password && !isLoading) {
+              if (email && password && !isLoading && !authLoading) {
                 e.target.style.transform = 'translateY(-2px)';
                 e.target.style.boxShadow = '0 8px 25px rgba(255, 87, 66, 0.45)';
               }
             }}
             onMouseLeave={(e) => {
               e.target.style.transform = 'translateY(0)';
-              e.target.style.boxShadow = email && password && !isLoading 
+              e.target.style.boxShadow = email && password && !isLoading && !authLoading
                 ? '0 6px 20px rgba(255, 87, 66, 0.35)' 
                 : 'none';
             }}
           >
-            {isLoading ? (
-              <span>Verificando...</span>
-            ) : (
-              <>
-                <LogIn size={20} style={{ marginRight: '10px' }} />
-                Iniciar Sesión
-              </>
-            )}
+            <LogIn size={20} style={{ marginRight: '10px' }} />
+            {isLoading || authLoading ? 'Verificando...' : 'Iniciar Sesión'}
           </button>
 
           <div style={styles.divider}>
@@ -199,41 +182,38 @@ export default function Login() {
         </div>
       </div>
 
-      <style>{keyframes}</style>
+      {showErrorModal && error && (
+        <Modal
+          isOpen={true}
+          onClose={handleCloseErrorModal}
+          title="Error en el inicio de sesión"
+          type="error"
+        >
+          <div style={{ textAlign: 'center' }}>
+            <p style={{ margin: '0 0 20px 0', color: '#475569', fontSize: '14px', lineHeight: '1.5' }}>
+              {error}
+            </p>
+            <button
+              onClick={handleCloseErrorModal}
+              style={{
+                padding: '10px 20px',
+                background: '#FF5742',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '600'
+              }}
+            >
+              Entendido
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
-
-const keyframes = `
-  @keyframes slideIn {
-    from {
-      opacity: 0;
-      transform: translateY(30px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  @keyframes scaleIn {
-    from {
-      transform: scale(0);
-    }
-    to {
-      transform: scale(1);
-    }
-  }
-
-  @keyframes float {
-    0%, 100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(-10px);
-    }
-  }
-`;
 
 const styles = {
   container: {
@@ -243,51 +223,51 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    padding: '20px',
+    boxSizing: 'border-box'
   },
   loginCard: {
     background: 'white',
     borderRadius: '15px',
-    padding: '60px',
+    padding: '40px',
     maxWidth: '500px',
     width: '100%',
-    boxShadow: '0 25px 70px rgba(0, 0, 0, 0.25)',
-    animation: 'slideIn 0.6s ease-out'
+    boxShadow: '0 25px 70px rgba(0, 0, 0, 0.25)'
   },
   header: {
     textAlign: 'center',
-    marginBottom: '48px'
+    marginBottom: '40px'
   },
   logoContainer: {
     display: 'flex',
     justifyContent: 'center',
-    marginBottom: '24px',
-    animation: 'float 3s ease-in-out infinite'
+    marginBottom: '20px'
   },
   title: {
-    fontSize: '36px',
+    fontSize: '32px',
     fontWeight: '700',
     color: '#FF5742',
-    marginBottom: '12px',
-    margin: '0 0 12px 0'
+    marginBottom: '10px',
+    margin: '0 0 10px 0'
   },
   subtitle: {
     color: '#000000',
-    fontSize: '17px',
+    fontSize: '16px',
     margin: 0
   },
   formContainer: {
     width: '100%'
   },
   inputGroup: {
-    marginBottom: '24px'
+    marginBottom: '20px'
   },
   label: {
     display: 'block',
-    marginBottom: '10px',
+    marginBottom: '8px',
     color: '#000000',
     fontWeight: '600',
-    fontSize: '15px'
+    fontSize: '14px'
   },
   inputWrapper: {
     position: 'relative',
@@ -295,7 +275,7 @@ const styles = {
   },
   inputIcon: {
     position: 'absolute',
-    left: '16px',
+    left: '12px',
     top: '50%',
     transform: 'translateY(-50%)',
     color: '#FF5742',
@@ -303,10 +283,10 @@ const styles = {
   },
   input: {
     width: '100%',
-    padding: '16px 16px 16px 50px',
+    padding: '14px 14px 14px 40px',
     border: '2px solid #CBD5E1',
-    borderRadius: '14px',
-    fontSize: '16px',
+    borderRadius: '12px',
+    fontSize: '15px',
     transition: 'all 0.3s',
     outline: 'none',
     boxSizing: 'border-box',
@@ -315,60 +295,33 @@ const styles = {
   },
   eyeIcon: {
     position: 'absolute',
-    right: '16px',
-    top: '60%',
+    right: '12px',
+    top: '50%',
     transform: 'translateY(-50%)',
     color: '#FF5742',
-    cursor: 'pointer',
-    transition: 'color 0.3s'
-  },
-  optionsRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '32px'
-  },
-  checkboxLabel: {
-    display: 'flex',
-    alignItems: 'center',
-    cursor: 'pointer'
-  },
-  checkbox: {
-    marginRight: '10px',
-    cursor: 'pointer',
-    width: '18px',
-    height: '18px'
-  },
-  checkboxText: {
-    fontSize: '15px',
-    color: '#455A64'
-  },
-  forgotLink: {
-    fontSize: '15px',
-    color: '#FF5742',
-    textDecoration: 'none',
-    fontWeight: '600',
     transition: 'color 0.3s'
   },
   loginButton: {
     width: '100%',
-    padding: '16px',
+    padding: '14px',
     color: 'white',
     border: 'none',
-    borderRadius: '14px',
-    fontSize: '17px',
+    borderRadius: '12px',
+    fontSize: '16px',
     fontWeight: '700',
     transition: 'all 0.3s',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    letterSpacing: '0.5px'
+    letterSpacing: '0.5px',
+    minHeight: '50px',
+    marginBottom: '20px'
   },
   divider: {
     display: 'flex',
     alignItems: 'center',
-    margin: '36px 0',
-    gap: '16px'
+    margin: '30px 0',
+    gap: '12px'
   },
   dividerLine: {
     flex: 1,
@@ -377,7 +330,7 @@ const styles = {
   },
   dividerText: {
     color: '#78909C',
-    fontSize: '15px',
+    fontSize: '14px',
     fontWeight: '600'
   },
   registerSection: {
@@ -385,113 +338,14 @@ const styles = {
   },
   registerText: {
     color: '#78909C',
-    fontSize: '15px',
-    marginRight: '8px'
+    fontSize: '14px',
+    marginRight: '6px'
   },
   registerLink: {
     color: '#FF5742',
-    fontSize: '15px',
+    fontSize: '14px',
     fontWeight: '700',
     textDecoration: 'none',
     transition: 'color 0.3s'
-  },
-  successCard: {
-    background: 'white',
-    borderRadius: '24px',
-    padding: '60px',
-    maxWidth: '700px',
-    width: '100%',
-    boxShadow: '0 25px 70px rgba(0, 0, 0, 0.25)',
-    animation: 'slideIn 0.6s ease-out'
-  },
-  successHeader: {
-    textAlign: 'center',
-    marginBottom: '48px'
-  },
-  successIconWrapper: {
-    width: '120px',
-    height: '120px',
-    background: 'linear-gradient(135deg, #38BDF8 0%, #7DD3FC 100%)',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    margin: '0 auto 28px',
-    animation: 'scaleIn 0.5s ease-out',
-    boxShadow: '0 10px 30px rgba(56, 189, 248, 0.3)'
-  },
-  successTitle: {
-    fontSize: '36px',
-    fontWeight: '700',
-    color: '#455A64',
-    marginBottom: '12px',
-    margin: '0 0 12px 0'
-  },
-  successSubtitle: {
-    color: '#78909C',
-    fontSize: '18px',
-    margin: 0
-  },
-  userInfoCard: {
-    background: 'linear-gradient(135deg, #455A64 0%, #607D8B 100%)',
-    borderRadius: '18px',
-    padding: '28px',
-    marginBottom: '28px',
-    color: 'white',
-    boxShadow: '0 8px 24px rgba(69, 90, 100, 0.2)'
-  },
-  infoRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '18px'
-  },
-  infoLabel: {
-    fontSize: '15px',
-    opacity: 0.9,
-    fontWeight: '500'
-  },
-  infoValue: {
-    fontSize: '17px',
-    fontWeight: '700'
-  },
-  pointsCard: {
-    background: 'linear-gradient(135deg, #FF5742 0%, #FF6B5B 100%)',
-    borderRadius: '18px',
-    padding: '40px',
-    color: 'white',
-    textAlign: 'center',
-    marginBottom: '36px',
-    boxShadow: '0 8px 24px rgba(255, 87, 66, 0.3)'
-  },
-  pointsLabel: {
-    fontSize: '16px',
-    opacity: 0.95,
-    marginBottom: '16px',
-    marginTop: '20px',
-    fontWeight: '500'
-  },
-  pointsValue: {
-    fontSize: '54px',
-    fontWeight: '700',
-    marginBottom: '12px',
-    letterSpacing: '-1px'
-  },
-  pointsSubtext: {
-    fontSize: '15px',
-    opacity: 0.9
-  },
-  logoutButton: {
-    width: '100%',
-    padding: '16px',
-    background: 'white',
-    color: '#FF5742',
-    border: '2px solid #FF5742',
-    borderRadius: '14px',
-    fontSize: '17px',
-    fontWeight: '700',
-    cursor: 'pointer',
-    transition: 'all 0.3s',
-    letterSpacing: '0.5px'
   }
 };

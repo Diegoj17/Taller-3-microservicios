@@ -33,10 +33,7 @@ const SuccessModal = ({ isOpen, onClose, customerData }) => {
             Tus beneficios inmediatos
           </div>
           <div style={successModalStyles.benefitsList}>
-            <div style={successModalStyles.benefitItem}>
-              <Award size={18} style={successModalStyles.benefitIcon} />
-              <span>500 puntos de bienvenida</span>
-            </div>
+
             <div style={successModalStyles.benefitItem}>
               <Gift size={18} style={successModalStyles.benefitIcon} />
               <span>10% de descuento en tu primera compra</span>

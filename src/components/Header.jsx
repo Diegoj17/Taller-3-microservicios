@@ -1,21 +1,23 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Home, Package, LogOut, User, Bell, Settings } from 'lucide-react';
+import { Home, Package, LogOut, Bell } from 'lucide-react';
 
 export default function Header({ currentView, onNavigate, onLogout, customerData }) {
   const [openNotifications, setOpenNotifications] = useState(false);
   const welcome = customerData?.welcomePackage || customerData?.envio;
-  const notificationCount = welcome ? 1 : 0;
-  const notificationTime = welcome?.fechaCreacion || '';
   const panelRef = useRef(null);
   const buttonRef = useRef(null);
 
-  // unread controla si mostrar el badge en el icono
-  const [unread, setUnread] = useState(Boolean(welcome));
+  // Estado para controlar si hay notificaciones sin leer (se resetea cada sesión)
+  const [unread, setUnread] = useState(false);
 
-  // Si cambia el welcome (nuevo pedido), marcar como no leído
+  // Key para sessionStorage por cliente
+  const notifKey = `notif_read_${customerData?.id || 'anon'}`;
+
+  // Inicializar unread leyendo sessionStorage; si no hay flag, mostrar
   useEffect(() => {
-    setUnread(Boolean(welcome));
-  }, [welcome]);
+    const dismissed = sessionStorage.getItem(notifKey) === '1';
+    setUnread(Boolean(welcome) && !dismissed);
+  }, [welcome, notifKey]);
 
   // Cerrar panel al hacer click fuera
   useEffect(() => {
@@ -36,12 +38,26 @@ export default function Header({ currentView, onNavigate, onLogout, customerData
     if (customerData?.genero === 'mujer') {
       return '👩';
     }
-    return '👨'; // Por defecto hombre
+    return '👨';
   };
 
   const getInitials = () => {
     if (!customerData) return 'U';
     return `${customerData.nombre?.charAt(0) || ''}${customerData.apellido?.charAt(0) || ''}`.toUpperCase();
+  };
+
+  // Manejar click en el botón de notificaciones
+  const handleNotificationClick = () => {
+    setOpenNotifications(!openNotifications);
+    // Marcar como leído cuando se abre
+    if (!openNotifications) {
+      setUnread(false);
+      try {
+        sessionStorage.setItem(notifKey, '1');
+      } catch {
+        // ignore sessionStorage errors
+      }
+    }
   };
 
   return (
@@ -89,9 +105,18 @@ export default function Header({ currentView, onNavigate, onLogout, customerData
         <div style={styles.userSection}>
           {/* Notificaciones */}
           <div style={{ position: 'relative' }} ref={panelRef}>
-            <button ref={buttonRef} style={styles.iconButton} onClick={() => { setOpenNotifications(!openNotifications); setUnread(false); }} aria-expanded={openNotifications} aria-label="Notificaciones">
+            <button 
+              ref={buttonRef} 
+              style={styles.iconButton} 
+              onClick={handleNotificationClick}
+              aria-expanded={openNotifications} 
+              aria-label="Notificaciones"
+            >
               <Bell size={20} color="#64748B" />
-              {notificationCount > 0 && unread && <div style={styles.notificationBadge}>{notificationCount}</div>}
+              {/* Mostrar badge solo si hay notificación Y no se ha leído en esta sesión */}
+              {welcome && unread && (
+                <div style={styles.notificationBadge}>1</div>
+              )}
             </button>
 
             {openNotifications && (
@@ -101,18 +126,26 @@ export default function Header({ currentView, onNavigate, onLogout, customerData
                 </div>
 
                 <div style={styles.notificationBody}>
-                  <div style={styles.notificationMessageTitle}>{welcome?.descripcion || 'Pedido en curso'}</div>
-                  <div style={styles.notificationMeta}>
-                    <span style={styles.notificationState}>{welcome?.estado || ''}</span>
-                    {notificationTime && <span style={styles.notificationTime}>{notificationTime}</span>}
+                  <div style={styles.notificationMessageTitle}>
+                    {welcome?.descripcion || 'Paquete de Bienvenida Premium (incluye sanduchera eléctrica)'}
                   </div>
-                  <div style={styles.notificationText}>{welcome?.details || ''}</div>
+                  <div style={styles.notificationMeta}>
+                    <span style={styles.notificationState}>
+                      {welcome?.estado || 'pendiente'}
+                    </span>
+                    {welcome?.fechaCreacion && (
+                      <span style={styles.notificationTime}>{welcome.fechaCreacion}</span>
+                    )}
+                  </div>
                 </div>
 
                 <div style={styles.notificationActions}>
                   <button
                     style={styles.viewButton}
-                    onClick={() => { setOpenNotifications(false); onNavigate('shipping'); }}
+                    onClick={() => { 
+                      setOpenNotifications(false); 
+                      onNavigate('shipping'); 
+                    }}
                   >
                     Ver pedido
                   </button>
@@ -256,10 +289,7 @@ const styles = {
     borderRadius: '10px',
     cursor: 'pointer',
     transition: 'all 0.3s ease',
-    color: '#64748B',
-    ':hover': {
-      background: '#F8FAFC'
-    }
+    color: '#64748B'
   },
   notificationBadge: {
     position: 'absolute',
@@ -270,11 +300,12 @@ const styles = {
     borderRadius: '50%',
     width: '18px',
     height: '18px',
-    fontSize: '10px',
+    fontSize: '11px',
     fontWeight: '700',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    animation: 'pulse 2s infinite'
   },
   userInfo: {
     display: 'flex',
@@ -326,13 +357,8 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 4px 15px rgba(255, 87, 66, 0.3)',
-    ':hover': {
-      transform: 'translateY(-2px)',
-      boxShadow: '0 6px 20px rgba(255, 87, 66, 0.4)'
-    }
-  }
-  ,
+    boxShadow: '0 4px 15px rgba(255, 87, 66, 0.3)'
+  },
   notificationPanel: {
     position: 'absolute',
     right: 0,
@@ -344,23 +370,17 @@ const styles = {
     padding: '12px',
     zIndex: 2000
   },
-  notificationTitle: {
-    fontSize: '14px',
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: '8px'
-  },
-  notificationMessage: {
-    fontSize: '13px',
-    color: '#475569'
-  }
-  ,
   notificationHeader: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingBottom: '8px',
     borderBottom: '1px solid #EEF2F7'
+  },
+  notificationTitle: {
+    fontSize: '14px',
+    fontWeight: '700',
+    color: '#1F2937'
   },
   notificationBody: {
     padding: '12px 8px'
@@ -369,33 +389,29 @@ const styles = {
     fontSize: '14px',
     fontWeight: '700',
     color: '#0F172A',
-    marginBottom: '6px'
+    marginBottom: '8px',
+    lineHeight: '1.4'
   },
   notificationMeta: {
     display: 'flex',
     gap: '8px',
     alignItems: 'center',
-    marginBottom: '8px'
+    marginBottom: '4px'
   },
   notificationState: {
     background: '#FEF3C7',
     color: '#92400E',
-    fontSize: '12px',
+    fontSize: '11px',
     padding: '4px 8px',
     borderRadius: '999px',
     fontWeight: '600'
   },
   notificationTime: {
-    fontSize: '12px',
+    fontSize: '11px',
     color: '#94A3B8'
   },
-  notificationText: {
-    fontSize: '13px',
-    color: '#475569',
-    marginBottom: '12px'
-  },
   notificationActions: {
-    padding: '0 8px 8px 8px',
+    padding: '8px 8px 4px 8px',
     display: 'flex',
     justifyContent: 'flex-end'
   },
@@ -403,15 +419,27 @@ const styles = {
     background: 'linear-gradient(135deg, #38BDF8 0%, #06B6D4 100%)',
     color: 'white',
     border: 'none',
-    padding: '8px 12px',
+    padding: '8px 16px',
     borderRadius: '8px',
     cursor: 'pointer',
-    fontWeight: '700'
+    fontWeight: '700',
+    fontSize: '12px'
   }
 };
 
-// Agregar estilos hover para los botones de navegación
+// Agregar animación pulse para el badge
 const hoverStyles = `
+  @keyframes pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.1);
+      opacity: 0.8;
+    }
+  }
+  
   .nav-link:hover {
     background: #F8FAFC;
     color: #37474F;
@@ -424,7 +452,6 @@ const hoverStyles = `
   }
 `;
 
-// Inyectar estilos hover de forma segura (añadir un <style> en head una sola vez)
 if (typeof document !== 'undefined') {
   const STYLE_ID = 'app-hover-styles';
   if (!document.getElementById(STYLE_ID)) {

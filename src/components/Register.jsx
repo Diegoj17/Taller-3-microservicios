@@ -97,7 +97,7 @@ export default function CustomerRegistration({ onRegister }) {
         direccion: formData.direccion,
         ciudad: formData.ciudad,
         codigoPostal: formData.codigoPostal,
-        password: password
+        contrasenia: password
       };
 
       // Registrar el cliente - el email se envía automáticamente via RabbitMQ
@@ -467,9 +467,6 @@ export default function CustomerRegistration({ onRegister }) {
               </div>
               <div style={modalContentStyles.detailRow}>
                 <strong>Teléfono:</strong> {registeredCustomer.telefono}
-              </div>
-              <div style={modalContentStyles.detailRow}>
-                <strong>Puntos de Bienvenida:</strong> {registeredCustomer.puntosLealtad} puntos
               </div>
               {registeredCustomer.envio && (
                 <div style={modalContentStyles.shippingInfo}>

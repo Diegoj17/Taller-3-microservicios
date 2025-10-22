@@ -3,6 +3,12 @@ import { CheckCircle, User, Mail } from 'lucide-react';
 import Modal from './Modal';
 
 const LoginModal = ({ isOpen, onClose, userData }) => {
+  const nombre = userData?.nombre || userData?.firstName || userData?.name || '';
+  const apellido = userData?.apellido || userData?.lastName || '';
+  const email = userData?.email || '';
+
+  const displayName = nombre || email || 'Usuario';
+
   return (
     <Modal 
       isOpen={isOpen} 
@@ -12,17 +18,17 @@ const LoginModal = ({ isOpen, onClose, userData }) => {
     >
       <div style={loginModalStyles.content}>
         <div style={loginModalStyles.welcomeText}>
-          Hola <strong>{userData?.firstName}</strong>, has iniciado sesión correctamente.
+          Hola <strong>{displayName}</strong>, has iniciado sesión correctamente.
         </div>
         
         <div style={loginModalStyles.userInfo}>
           <div style={loginModalStyles.infoItem}>
             <User size={18} style={loginModalStyles.infoIcon} />
-            <span>{userData?.firstName} {userData?.lastName}</span>
+            <span>{nombre} {apellido}</span>
           </div>
           <div style={loginModalStyles.infoItem}>
             <Mail size={18} style={loginModalStyles.infoIcon} />
-            <span>{userData?.email}</span>
+            <span>{email}</span>
           </div>
         </div>
 
